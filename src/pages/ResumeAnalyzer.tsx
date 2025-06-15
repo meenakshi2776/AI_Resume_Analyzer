@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,6 @@ import { analyzeResumeText } from '@/utils/resumeAnalyzer';
 
 const ResumeAnalyzer = () => {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [resumeText, setResumeText] = useState<string>('');
   const [analysis, setAnalysis] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -25,9 +24,18 @@ const ResumeAnalyzer = () => {
   const { toast } = useToast();
 
   const handleFileUpload = (file: File) => {
-    if (file.type === 'application/pdf' || file.type === 'text/plain' || file.name.endsWith('.doc') || file.name.endsWith('.docx')) {
+    console.log('File upload attempted:', file.name, file.type);
+    
+    if (file.type === 'application/pdf' || 
+        file.type === 'text/plain' || 
+        file.type === 'application/msword' ||
+        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        file.name.toLowerCase().endsWith('.pdf') ||
+        file.name.toLowerCase().endsWith('.doc') ||
+        file.name.toLowerCase().endsWith('.docx') ||
+        file.name.toLowerCase().endsWith('.txt')) {
+      
       setResumeFile(file);
-      setResumeText(`Resume content from ${file.name}`);
       setShowSuccess(true);
       
       toast({
@@ -35,12 +43,13 @@ const ResumeAnalyzer = () => {
         description: `${file.name} is ready for analysis`,
       });
 
-      // Auto-redirect after 2 seconds
+      // Auto-redirect to analysis after 2 seconds
       setTimeout(() => {
         setShowSuccess(false);
-        analyzeResume();
+        analyzeResume(file);
       }, 2000);
     } else {
+      console.log('Invalid file type:', file.type);
       toast({
         title: "Invalid file type",
         description: "Please upload a PDF, DOC, DOCX, or TXT file",
@@ -50,41 +59,46 @@ const ResumeAnalyzer = () => {
   };
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('Input change event triggered');
     const file = event.target.files?.[0];
     if (file) {
+      console.log('File selected:', file);
       handleFileUpload(file);
+    } else {
+      console.log('No file selected');
     }
   };
 
   const handleDragOver = (event: React.DragEvent) => {
     event.preventDefault();
+    event.stopPropagation();
     setIsDragOver(true);
   };
 
   const handleDragLeave = (event: React.DragEvent) => {
     event.preventDefault();
+    event.stopPropagation();
     setIsDragOver(false);
   };
 
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();
+    event.stopPropagation();
     setIsDragOver(false);
     
     const file = event.dataTransfer.files[0];
     if (file) {
+      console.log('File dropped:', file);
       handleFileUpload(file);
     }
   };
 
-  const handleTextInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setResumeText(event.target.value);
-  };
-
-  const analyzeResume = async () => {
-    if (!resumeText.trim()) {
+  const analyzeResume = async (file?: File) => {
+    const fileToAnalyze = file || resumeFile;
+    if (!fileToAnalyze) {
       toast({
-        title: "No resume content",
-        description: "Please upload a file or paste resume text",
+        title: "No resume file",
+        description: "Please upload a resume file",
         variant: "destructive",
       });
       return;
@@ -92,7 +106,9 @@ const ResumeAnalyzer = () => {
 
     setIsAnalyzing(true);
     try {
-      const analysisResult = await analyzeResumeText(resumeText);
+      // Mock resume text based on file name for now
+      const mockResumeText = `Resume content from ${fileToAnalyze.name}`;
+      const analysisResult = await analyzeResumeText(mockResumeText);
       setAnalysis(analysisResult);
       toast({
         title: "Analysis completed",
@@ -112,8 +128,15 @@ const ResumeAnalyzer = () => {
 
   const clearFile = () => {
     setResumeFile(null);
-    setResumeText('');
     setShowSuccess(false);
+    setAnalysis(null);
+  };
+
+  const handleChooseFileClick = () => {
+    const fileInput = document.getElementById('resume-file') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
   };
 
   return (
@@ -135,13 +158,13 @@ const ResumeAnalyzer = () => {
                 Upload Your Resume
               </CardTitle>
               <CardDescription className="text-blue-100">
-                Upload your resume file or paste the text content for analysis
+                Upload your resume file for comprehensive AI analysis
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-8 space-y-8">
+            <CardContent className="p-8">
               {/* Drag and Drop Upload Area */}
               <div
-                className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
+                className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 cursor-pointer ${
                   isDragOver 
                     ? 'border-blue-500 bg-blue-50 scale-105' 
                     : resumeFile 
@@ -151,12 +174,16 @@ const ResumeAnalyzer = () => {
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
+                onClick={handleChooseFileClick}
               >
                 {showSuccess ? (
                   <div className="animate-fade-in">
-                    <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4 animate-scale-in" />
+                    <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4 animate-bounce" />
                     <h3 className="text-xl font-semibold text-green-700 mb-2">Upload Successful!</h3>
-                    <p className="text-green-600">Redirecting to analysis...</p>
+                    <p className="text-green-600">Analyzing your resume...</p>
+                    <div className="mt-4">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto"></div>
+                    </div>
                   </div>
                 ) : resumeFile ? (
                   <div className="animate-fade-in">
@@ -169,13 +196,36 @@ const ResumeAnalyzer = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={clearFile}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          clearFile();
+                        }}
                         className="text-red-500 hover:text-red-700 hover:bg-red-50"
                       >
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
-                    <p className="text-green-600 font-medium">File ready for analysis</p>
+                    <p className="text-green-600 font-medium mb-4">File ready for analysis</p>
+                    <Button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        analyzeResume();
+                      }}
+                      disabled={isAnalyzing}
+                      className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Target className="h-4 w-4 mr-2" />
+                          Analyze Resume
+                        </>
+                      )}
+                    </Button>
                   </div>
                 ) : (
                   <div className="animate-fade-in">
@@ -186,18 +236,13 @@ const ResumeAnalyzer = () => {
                       {isDragOver ? 'Drop your file here' : 'Drag & drop your resume'}
                     </h3>
                     <p className="text-gray-500 mb-4">or click to browse files</p>
-                    <Label htmlFor="resume-file" className="cursor-pointer">
-                      <Button variant="outline" className="hover-scale">
-                        Choose File
-                      </Button>
-                    </Label>
-                    <Input
-                      id="resume-file"
-                      type="file"
-                      accept=".pdf,.doc,.docx,.txt"
-                      onChange={handleInputChange}
-                      className="hidden"
-                    />
+                    <Button 
+                      variant="outline" 
+                      className="hover:scale-105 transition-transform"
+                      onClick={handleChooseFileClick}
+                    >
+                      Choose File
+                    </Button>
                     <p className="text-xs text-gray-400 mt-4">
                       Supported formats: PDF, DOC, DOCX, TXT (Max 10MB)
                     </p>
@@ -205,52 +250,32 @@ const ResumeAnalyzer = () => {
                 )}
               </div>
 
-              {/* Text Input Alternative */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex-1 h-px bg-gray-300"></div>
-                  <span className="text-gray-500 font-medium">OR</span>
-                  <div className="flex-1 h-px bg-gray-300"></div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="resume-text" className="text-lg font-semibold">Paste Resume Text</Label>
-                  <textarea
-                    id="resume-text"
-                    value={resumeText}
-                    onChange={handleTextInput}
-                    placeholder="Paste your complete resume content here for analysis..."
-                    className="w-full h-48 p-4 border-2 border-gray-300 rounded-xl resize-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
-                  />
-                </div>
-              </div>
-
-              {/* Analyze Button */}
-              {resumeText.trim() && !showSuccess && (
-                <Button 
-                  onClick={analyzeResume} 
-                  disabled={isAnalyzing}
-                  className="w-full h-14 text-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 animate-fade-in hover-scale"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                      Analyzing Resume...
-                    </>
-                  ) : (
-                    <>
-                      <Target className="h-5 w-5 mr-3" />
-                      Analyze Resume
-                    </>
-                  )}
-                </Button>
-              )}
+              {/* Hidden File Input */}
+              <Input
+                id="resume-file"
+                type="file"
+                accept=".pdf,.doc,.docx,.txt"
+                onChange={handleInputChange}
+                className="hidden"
+              />
             </CardContent>
           </Card>
         )}
 
         {analysis && (
           <div className="animate-fade-in">
+            <div className="mb-6 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-900">Resume Analysis Results</h2>
+              <Button 
+                onClick={clearFile}
+                variant="outline"
+                className="hover:bg-gray-50"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload New Resume
+              </Button>
+            </div>
+
             <Tabs defaultValue="personal" className="w-full">
               <TabsList className="grid w-full grid-cols-6 mb-8">
                 <TabsTrigger value="personal" className="flex items-center gap-2">
